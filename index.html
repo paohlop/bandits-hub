@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>The Bandits — Team Hub</title>
+<style>
+  :root {
+    --gold: #f5c542;
+    --gold-soft: #ffe08a;
+    --red: #c0392b;
+    --panel: rgba(20, 12, 34, 0.72);
+    --panel-border: rgba(245, 197, 66, 0.35);
+    --text: #f4eefb;
+    --muted: #b79fd6;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    min-height: 100vh;
+    font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+    color: var(--text);
+    background:
+      radial-gradient(circle at 20% 10%, #3a1a5e 0%, transparent 45%),
+      radial-gradient(circle at 85% 90%, #4a1030 0%, transparent 45%),
+      linear-gradient(160deg, #1c0f30 0%, #120a1f 60%, #08040f 100%);
+    background-attachment: fixed;
+    padding-bottom: 60px;
+  }
+  header { text-align: center; padding: 32px 16px 8px; }
+  header h1 {
+    font-size: clamp(1.8rem, 5vw, 3rem);
+    letter-spacing: 3px;
+    background: linear-gradient(90deg, var(--gold-soft), var(--gold));
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+    text-shadow: 0 0 30px rgba(245, 197, 66, 0.25);
+  }
+  header p { color: var(--muted); margin-top: 6px; letter-spacing: 1px; }
+
+  .sync-status {
+    display: inline-flex; align-items: center; gap: 8px; margin-top: 12px;
+    font-size: 0.82rem; color: var(--muted);
+    background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.12);
+    padding: 6px 14px; border-radius: 30px;
+  }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: #888; transition: background 0.3s; }
+  .dot.online { background: #2ecc71; box-shadow: 0 0 10px #2ecc71; }
+  .dot.offline { background: #e05545; box-shadow: 0 0 10px #e05545; }
+  .dot.connecting { background: var(--gold); box-shadow: 0 0 10px var(--gold); }
+
+  .tabs { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin: 22px auto 20px; max-width: 700px; padding: 0 12px; }
+  .tab {
+    background: var(--panel); border: 1px solid var(--panel-border); color: var(--text);
+    padding: 12px 22px; border-radius: 40px; cursor: pointer; font-size: 1rem; font-weight: bold;
+    letter-spacing: 0.5px; transition: all 0.2s ease;
+  }
+  .tab:hover { border-color: var(--gold); transform: translateY(-2px); }
+  .tab.active { background: linear-gradient(180deg, var(--gold), #d9a422); color: #2a1400; box-shadow: 0 6px 20px rgba(245,197,66,0.35); }
+
+  .view { display: none; max-width: 900px; margin: 0 auto; padding: 0 18px; }
+  .view.active { display: block; animation: fade 0.35s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(10px);} to {opacity:1; transform:none;} }
+
+  .panel { background: var(--panel); border: 1px solid var(--panel-border); border-radius: 18px; padding: 24px; backdrop-filter: blur(6px); box-shadow: 0 20px 50px rgba(0,0,0,0.4); }
+  h2 { margin-bottom: 6px; color: var(--gold-soft); letter-spacing: 1px; }
+  .hint { color: var(--muted); font-size: 0.9rem; margin-bottom: 18px; }
+
+  input, textarea, select {
+    font-family: inherit; background: rgba(0,0,0,0.35); border: 1px solid rgba(245,197,66,0.3);
+    color: var(--text); padding: 11px 14px; border-radius: 10px; font-size: 0.95rem; outline: none;
+  }
+  input:focus, textarea:focus { border-color: var(--gold); }
+  input::placeholder { color: #8f79b0; }
+
+  button.btn { font-family: inherit; cursor: pointer; border: none; border-radius: 10px; padding: 11px 20px; font-weight: bold; font-size: 0.95rem; letter-spacing: 0.5px; transition: transform 0.15s ease; }
+  button.btn:active { transform: scale(0.96); }
+  button.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-gold { background: linear-gradient(180deg, var(--gold), #d9a422); color: #2a1400; box-shadow: 0 4px 16px rgba(245,197,66,0.3); }
+  .btn-red  { background: linear-gradient(180deg, #e05545, var(--red)); color: #fff; }
+  .btn-ghost{ background: rgba(255,255,255,0.08); color: var(--text); border: 1px solid rgba(255,255,255,0.15); }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+  .roulette-wrap { display: flex; flex-direction: column; align-items: center; gap: 20px; }
+  .wheel-stage { position: relative; width: min(360px, 82vw); height: min(360px, 82vw); }
+  .pointer { position: absolute; top: -6px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 16px solid transparent; border-right: 16px solid transparent; border-top: 28px solid var(--gold); filter: drop-shadow(0 3px 4px rgba(0,0,0,0.6)); z-index: 5; }
+  .wheel { width: 100%; height: 100%; border-radius: 50%; border: 10px solid #3a2410; box-shadow: 0 0 0 6px var(--gold), 0 0 0 12px #2a1a0a, 0 25px 60px rgba(0,0,0,0.6), inset 0 0 40px rgba(0,0,0,0.5); transition: transform 5s cubic-bezier(0.15, 0.9, 0.25, 1); background: #222; }
+  .wheel-hub { position: absolute; top: 50%; left: 50%; width: 54px; height: 54px; transform: translate(-50%,-50%); border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff2c0, var(--gold) 55%, #b8871a); box-shadow: 0 0 18px rgba(0,0,0,0.6); z-index: 4; border: 3px solid #2a1a0a; }
+  .winner-banner { text-align: center; font-size: 1.6rem; font-weight: bold; min-height: 40px; color: var(--gold-soft); text-shadow: 0 0 18px rgba(245,197,66,0.5); }
+  .winner-banner.pop { animation: pop 0.5s ease; }
+  @keyframes pop { 0%{transform:scale(0.4);opacity:0;} 100%{transform:scale(1);opacity:1;} }
+  .members { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; justify-content: center; }
+  .chip { display: inline-flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); padding: 6px 12px; border-radius: 30px; font-size: 0.9rem; }
+  .chip.done { opacity: 0.45; text-decoration: line-through; }
+  .chip .x { cursor: pointer; color: #ff8b7d; font-weight: bold; }
+
+  .game-select { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+  .game-select .btn { flex: 1; min-width: 140px; }
+  .game-card { display: none; }
+  .game-card.active { display: block; animation: fade 0.3s ease; }
+  .question { font-size: 1.25rem; font-weight: bold; margin: 14px 0 18px; line-height: 1.4; }
+  .options { display: grid; gap: 10px; }
+  .option { text-align: left; padding: 14px 16px; border-radius: 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); cursor: pointer; font-size: 1rem; color: var(--text); font-family: inherit; transition: all 0.15s ease; }
+  .option:hover { border-color: var(--gold); background: rgba(245,197,66,0.08); }
+  .option.correct { background: rgba(46,160,80,0.25); border-color: #2ea050; }
+  .option.wrong { background: rgba(192,57,43,0.25); border-color: var(--red); }
+  .score { color: var(--muted); margin-top: 14px; }
+  .big-prompt { font-size: 1.35rem; font-weight: bold; line-height: 1.5; margin: 16px 0 22px; min-height: 90px; display: flex; align-items: center; justify-content: center; text-align: center; padding: 18px; border-radius: 14px; background: rgba(0,0,0,0.3); border: 1px dashed rgba(245,197,66,0.35); }
+
+  .hl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 640px) { .hl-grid { grid-template-columns: 1fr; } }
+  .hl-high h3 { color: #7ee0a0; margin-bottom: 10px; }
+  .hl-low h3 { color: #ff9d8f; margin-bottom: 10px; }
+  .entry-list { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; min-height: 40px; }
+  .entry { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 10px 12px; font-size: 0.92rem; display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+  .entry .who { color: var(--gold-soft); font-weight: bold; font-size: 0.8rem; display: block; margin-bottom: 3px; }
+  .entry .del { cursor: pointer; color: #ff8b7d; font-weight: bold; flex-shrink: 0; }
+  .empty { color: var(--muted); font-size: 0.85rem; font-style: italic; }
+  .encourage { text-align: center; color: var(--gold-soft); margin: 14px 0; font-size: 0.95rem; background: rgba(245,197,66,0.08); border: 1px solid rgba(245,197,66,0.25); padding: 10px; border-radius: 10px; }
+  .stat { color: var(--muted); font-size: 0.85rem; text-align: center; margin-top: 14px; }
+  label.small { font-size: 0.8rem; color: var(--muted); display: block; margin-bottom: 4px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>THE BANDITS</h1>
+  <p>Spin. Play. Share. Live-synced with the whole crew.</p>
+  <div class="sync-status"><span class="dot connecting" id="syncDot"></span><span id="syncText">Connecting to sync…</span></div>
+</header>
+
+<div class="tabs">
+  <button class="tab active" data-view="roulette">Roulette</button>
+  <button class="tab" data-view="games">Games</button>
+  <button class="tab" data-view="board">Highlights &amp; Lowlights</button>
+</div>
+
+<!-- ROULETTE -->
+<section class="view active" id="roulette">
+  <div class="panel roulette-wrap">
+    <h2>Whose Turn Is It?</h2>
+    <p class="hint">The roster and picks sync live for everyone. Anyone can spin.</p>
+    <div class="wheel-stage">
+      <div class="pointer"></div>
+      <canvas class="wheel" id="wheelCanvas" width="600" height="600"></canvas>
+      <div class="wheel-hub"></div>
+    </div>
+    <div class="winner-banner" id="winnerBanner"></div>
+    <div class="row">
+      <button class="btn btn-gold" id="spinBtn">Spin the Wheel</button>
+      <button class="btn btn-ghost" id="resetPickedBtn">Reset picks</button>
+    </div>
+    <div class="row" style="margin-top:10px;">
+      <input type="text" id="memberInput" placeholder="Add a Bandit..." style="flex:1; min-width:180px;" />
+      <button class="btn btn-gold" id="addMemberBtn">Add</button>
+    </div>
+    <div class="members" id="membersList"></div>
+  </div>
+</section>
+
+<!-- GAMES -->
+<section class="view" id="games">
+  <div class="panel">
+    <h2>Team Games</h2>
+    <p class="hint">Play together on the call. Keep it friendly and inclusive.</p>
+    <div class="game-select">
+      <button class="btn btn-gold game-tab active" data-game="trivia">Trivia</button>
+      <button class="btn btn-ghost game-tab" data-game="wyr">Would You Rather</button>
+      <button class="btn btn-ghost game-tab" data-game="ttl">Two Truths &amp; a Lie</button>
+    </div>
+    <div class="game-card active" id="game-trivia">
+      <div class="question" id="triviaQ">Loading...</div>
+      <div class="options" id="triviaOptions"></div>
+      <div class="score" id="triviaScore">Score: 0 / 0</div>
+      <div class="row" style="margin-top:14px;"><button class="btn btn-gold" id="triviaNext">Next question</button></div>
+    </div>
+    <div class="game-card" id="game-wyr">
+      <div class="big-prompt" id="wyrPrompt">Tap below for a question.</div>
+      <div class="row"><button class="btn btn-gold" id="wyrNext">New Would You Rather</button></div>
+      <p class="hint" style="margin-top:14px;">Go around the room — everyone shares their pick and why.</p>
+    </div>
+    <div class="game-card" id="game-ttl">
+      <div class="big-prompt" id="ttlPrompt">Ready to play?</div>
+      <div class="row"><button class="btn btn-gold" id="ttlStart">Pick a player &amp; go</button></div>
+      <p class="hint" style="margin-top:14px;">The chosen player states two truths and one lie. The team guesses the lie.</p>
+    </div>
+  </div>
+</section>
+
+<!-- BOARD -->
+<section class="view" id="board">
+  <div class="panel">
+    <h2>Weekly Highlights &amp; Lowlights</h2>
+    <p class="hint">Share a win and a challenge. Posts appear instantly for the whole team.</p>
+    <div class="encourage" id="encourage"></div>
+    <div class="row" style="margin-bottom:16px; align-items:flex-end;">
+      <div style="flex:1; min-width:150px;">
+        <label class="small">Your name</label>
+        <input type="text" id="hlName" placeholder="Who's sharing?" style="width:100%;" />
+      </div>
+      <div style="flex:2; min-width:220px;">
+        <label class="small">Highlight or lowlight</label>
+        <input type="text" id="hlText" placeholder="What happened this week?" style="width:100%;" />
+      </div>
+    </div>
+    <div class="row" style="margin-bottom:20px;">
+      <button class="btn btn-gold" id="addHigh">+ Add Highlight</button>
+      <button class="btn btn-red" id="addLow">+ Add Lowlight</button>
+      <button class="btn btn-ghost" id="clearWeek">Clear week</button>
+    </div>
+    <div class="hl-grid">
+      <div class="hl-high"><h3>Highlights</h3><div class="entry-list" id="highList"></div></div>
+      <div class="hl-low"><h3>Lowlights</h3><div class="entry-list" id="lowList"></div></div>
+    </div>
+    <div class="stat" id="participation"></div>
+  </div>
+</section>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
+import {
+  getFirestore, doc, setDoc, onSnapshot,
+  collection, addDoc, deleteDoc, getDocs, query, orderBy, serverTimestamp, writeBatch
+} from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyD-AiRqpXle7d9LJP01M_msVUYAWo5ZxTY",
+  authDomain: "the-bandits-hub-4aef1.firebaseapp.com",
+  projectId: "the-bandits-hub-4aef1",
+  storageBucket: "the-bandits-hub-4aef1.firebasestorage.app",
+  messagingSenderId: "405870687826",
+  appId: "1:405870687826:web:358188d6a5cc83010d918b"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+/* Firestore layout:
+   rooms/bandits (doc)            -> { members: [..], picked: [..] }
+   rooms/bandits/entries (coll)   -> { name, text, type, ts }
+*/
+const ROOM = "bandits";
+const roomRef = doc(db, "rooms", ROOM);
+const entriesRef = collection(db, "rooms", ROOM, "entries");
+
+const DEFAULT_MEMBERS = ["Aksha","Alex","Andrea","Paola","Amruth","Jeff","Josh","Dnyanal","Guy","Ihn","Jose","Nick","Parth","Ray","Sonal","Stavi","Surya"];
+
+/* ---- sync status indicator ---- */
+const syncDot = document.getElementById("syncDot");
+const syncText = document.getElementById("syncText");
+function setSync(state, msg) { syncDot.className = "dot " + state; syncText.textContent = msg; }
+
+/* ---- local mirror of synced state ---- */
+let members = [];
+let picked = [];
+let entries = [];
+let roomLoaded = false;
+
+/* ============ TABS ============ */
+document.querySelectorAll(".tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+    tab.classList.add("active");
+    document.getElementById(tab.dataset.view).classList.add("active");
+  });
+});
+
+/* ============ ROULETTE ============ */
+const canvas = document.getElementById("wheelCanvas");
+const ctx = canvas.getContext("2d");
+let currentRotation = 0;
+let spinning = false;
+const wheelColors = ["#c0392b", "#0b6b3a", "#1c1c1c", "#d9a422", "#7a1f5c", "#1f4e8a"];
+
+function drawWheel() {
+  const n = members.length, size = canvas.width, r = size / 2;
+  ctx.clearRect(0, 0, size, size);
+  if (n === 0) {
+    ctx.fillStyle = "#2a1a3a"; ctx.beginPath(); ctx.arc(r, r, r, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = "#b79fd6"; ctx.font = "bold 30px Trebuchet MS"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText("Add Bandits", r, r); return;
+  }
+  const arc = (Math.PI*2)/n;
+  for (let i=0;i<n;i++){
+    const start = i*arc;
+    ctx.beginPath(); ctx.moveTo(r,r); ctx.arc(r,r,r,start,start+arc); ctx.closePath();
+    ctx.fillStyle = wheelColors[i % wheelColors.length]; ctx.fill();
+    ctx.strokeStyle = "rgba(245,197,66,0.6)"; ctx.lineWidth = 3; ctx.stroke();
+    ctx.save(); ctx.translate(r,r); ctx.rotate(start+arc/2);
+    ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillStyle = "#fff";
+    ctx.font = "bold " + Math.max(14, 34 - n) + "px Trebuchet MS";
+    const name = members[i];
+    ctx.fillText(name.length > 12 ? name.slice(0,11)+"…" : name, r - 24, 0);
+    ctx.restore();
+  }
+}
+
+function renderMembers() {
+  const list = document.getElementById("membersList");
+  list.innerHTML = "";
+  members.forEach((m) => {
+    const chip = document.createElement("span");
+    chip.className = "chip" + (picked.includes(m) ? " done" : "");
+    chip.innerHTML = `<span>${escapeHtml(m)}</span><span class="x">✕</span>`;
+    chip.querySelector(".x").addEventListener("click", () => {
+      const next = members.filter(x => x !== m);
+      saveRoom({ members: next, picked: picked.filter(p => p !== m) });
+    });
+    list.appendChild(chip);
+  });
+}
+
+async function saveRoom(patch) {
+  // optimistic local update happens via onSnapshot; just write
+  try {
+    await setDoc(roomRef, {
+      members: patch.members !== undefined ? patch.members : members,
+      picked: patch.picked !== undefined ? patch.picked : picked
+    }, { merge: true });
+  } catch (e) {
+    setSync("offline", "Save failed — check connection");
+    console.error(e);
+  }
+}
+
+document.getElementById("addMemberBtn").addEventListener("click", addMember);
+document.getElementById("memberInput").addEventListener("keydown", e => { if (e.key === "Enter") addMember(); });
+function addMember() {
+  const input = document.getElementById("memberInput");
+  const name = input.value.trim();
+  if (!name) return;
+  if (members.includes(name)) { input.value = ""; return; }
+  saveRoom({ members: [...members, name] });
+  input.value = "";
+}
+
+document.getElementById("resetPickedBtn").addEventListener("click", () => {
+  saveRoom({ picked: [] });
+  document.getElementById("winnerBanner").textContent = "";
+});
+
+document.getElementById("spinBtn").addEventListener("click", () => {
+  if (spinning || members.length === 0) return;
+  const remaining = members.filter(m => !picked.includes(m));
+  const pool = remaining.length ? remaining : members;
+  const winner = pool[Math.floor(Math.random() * pool.length)];
+  const winnerIndex = members.indexOf(winner);
+  const n = members.length, arc = 360 / n;
+  const sliceMid = winnerIndex * arc + arc / 2;
+  const targetAngle = 270 - sliceMid;
+  const spins = 5 * 360;
+  currentRotation += spins + (targetAngle - (currentRotation % 360));
+  spinning = true;
+  document.getElementById("winnerBanner").textContent = "";
+  canvas.style.transform = `rotate(${currentRotation}deg)`;
+  setTimeout(() => {
+    spinning = false;
+    const banner = document.getElementById("winnerBanner");
+    banner.textContent = "🎉 " + winner + " is up!";
+    banner.classList.remove("pop"); void banner.offsetWidth; banner.classList.add("pop");
+    if (!picked.includes(winner)) saveRoom({ picked: [...picked, winner] });
+  }, 5100);
+});
+
+/* realtime room listener */
+onSnapshot(roomRef, (snap) => {
+  setSync("online", "Live — synced with the team");
+  if (!snap.exists()) {
+    // seed defaults once
+    if (!roomLoaded) setDoc(roomRef, { members: DEFAULT_MEMBERS, picked: [] });
+    roomLoaded = true;
+    return;
+  }
+  roomLoaded = true;
+  const data = snap.data();
+  members = Array.isArray(data.members) ? data.members : [];
+  picked = Array.isArray(data.picked) ? data.picked : [];
+  drawWheel();
+  renderMembers();
+}, (err) => {
+  setSync("offline", "Offline — sync unavailable");
+  console.error("room listener error", err);
+  // fall back so the UI still works locally
+  if (!members.length) { members = DEFAULT_MEMBERS.slice(); drawWheel(); renderMembers(); }
+});
+
+/* ============ GAMES (local, no shared state) ============ */
+document.querySelectorAll(".game-tab").forEach(gt => {
+  gt.addEventListener("click", () => {
+    document.querySelectorAll(".game-tab").forEach(g => { g.classList.remove("active","btn-gold"); g.classList.add("btn-ghost"); });
+    gt.classList.add("active","btn-gold"); gt.classList.remove("btn-ghost");
+    document.querySelectorAll(".game-card").forEach(c => c.classList.remove("active"));
+    document.getElementById("game-" + gt.dataset.game).classList.add("active");
+  });
+});
+
+const triviaBank = [
+  { q: "Which planet is known as the Red Planet?", a: ["Venus","Mars","Jupiter","Saturn"], c: 1 },
+  { q: "How many continents are there on Earth?", a: ["5","6","7","8"], c: 2 },
+  { q: "What does 'HTTP' stand for?", a: ["HyperText Transfer Protocol","High Transfer Text Process","Hyperlink Text Transmission Path","Home Tool Transfer Protocol"], c: 0 },
+  { q: "Which ocean is the largest?", a: ["Atlantic","Indian","Arctic","Pacific"], c: 3 },
+  { q: "Who painted the Mona Lisa?", a: ["Van Gogh","Da Vinci","Picasso","Rembrandt"], c: 1 },
+  { q: "What year did the first iPhone launch?", a: ["2005","2007","2009","2010"], c: 1 },
+  { q: "Which gas do plants absorb from the atmosphere?", a: ["Oxygen","Nitrogen","Carbon Dioxide","Hydrogen"], c: 2 },
+  { q: "What is the capital of Australia?", a: ["Sydney","Melbourne","Canberra","Perth"], c: 2 },
+  { q: "How many strings does a standard guitar have?", a: ["4","5","6","7"], c: 2 },
+  { q: "In computing, what does 'CPU' stand for?", a: ["Central Process Unit","Central Processing Unit","Computer Personal Unit","Core Processing Utility"], c: 1 },
+  { q: "Which animal is known as the King of the Jungle?", a: ["Tiger","Elephant","Lion","Bear"], c: 2 },
+  { q: "What is the smallest prime number?", a: ["0","1","2","3"], c: 2 },
+  { q: "Which country hosted the 2016 Summer Olympics?", a: ["China","Brazil","UK","Japan"], c: 1 },
+  { q: "What is the chemical symbol for gold?", a: ["Gd","Go","Au","Ag"], c: 2 },
+  { q: "How many minutes are in a full day?", a: ["720","1000","1440","1800"], c: 2 }
+];
+let triviaOrder = [], triviaIdx = 0, triviaScore = 0, triviaAnswered = 0;
+function shuffle(arr){ const a=arr.slice(); for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
+function loadTrivia() {
+  if (triviaIdx >= triviaOrder.length) { triviaOrder = shuffle(triviaBank.map((_,i)=>i)); triviaIdx = 0; }
+  const item = triviaBank[triviaOrder[triviaIdx]];
+  document.getElementById("triviaQ").textContent = item.q;
+  const box = document.getElementById("triviaOptions"); box.innerHTML = "";
+  item.a.forEach((opt, i) => {
+    const b = document.createElement("button"); b.className = "option"; b.textContent = opt;
+    b.addEventListener("click", () => {
+      Array.from(box.children).forEach(c => c.disabled = true);
+      triviaAnswered++;
+      if (i === item.c) { b.classList.add("correct"); triviaScore++; }
+      else { b.classList.add("wrong"); box.children[item.c].classList.add("correct"); }
+      document.getElementById("triviaScore").textContent = `Score: ${triviaScore} / ${triviaAnswered}`;
+    });
+    box.appendChild(b);
+  });
+}
+document.getElementById("triviaNext").addEventListener("click", () => { triviaIdx++; loadTrivia(); });
+
+const wyrBank = [
+  "Would you rather have unlimited coffee or unlimited snacks at work forever?",
+  "Would you rather always work 4-hour days but 6 days a week, or 8-hour days for 4 days?",
+  "Would you rather instantly clear your inbox or instantly finish any meeting on time?",
+  "Would you rather present to 1,000 people or write a 100-page report?",
+  "Would you rather have a personal robot assistant or a personal chef?",
+  "Would you rather teleport to work or never sit in traffic again?",
+  "Would you rather every meeting be a walking meeting or every meeting be over video?",
+  "Would you rather master every programming language or every spoken language?",
+  "Would you rather work from a beach or a mountain cabin?",
+  "Would you rather have unlimited vacation days or a 4-day work week?",
+  "Would you rather always know the right answer or always ask the perfect question?",
+  "Would you rather have a photographic memory or be able to speed-read anything?",
+  "Would you rather lead a huge project or perfect a small one?",
+  "Would you rather have your desk in a treehouse or underwater with a view?",
+  "Would you rather celebrate every small win loudly or save it for one big party?"
+];
+let wyrOrder = shuffle(wyrBank.map((_,i)=>i)), wyrIdx = 0;
+document.getElementById("wyrNext").addEventListener("click", () => {
+  if (wyrIdx >= wyrOrder.length) { wyrOrder = shuffle(wyrBank.map((_,i)=>i)); wyrIdx = 0; }
+  document.getElementById("wyrPrompt").textContent = wyrBank[wyrOrder[wyrIdx]]; wyrIdx++;
+});
+
+document.getElementById("ttlStart").addEventListener("click", () => {
+  const pool = members.length ? members : ["Someone on the team"];
+  const player = pool[Math.floor(Math.random() * pool.length)];
+  document.getElementById("ttlPrompt").innerHTML =
+    `<div><span style="color:var(--gold-soft)">${escapeHtml(player)}</span><br>Share <b>two truths</b> and <b>one lie</b> about yourself.<br><span style="font-size:0.9rem;color:var(--muted)">The team guesses the lie!</span></div>`;
+});
+
+/* ============ HIGHLIGHTS / LOWLIGHTS (synced) ============ */
+const encourageLines = [
+  "Every share counts — big or small!",
+  "No win is too tiny to celebrate.",
+  "Honesty about lowlights helps us all grow.",
+  "Your update might help a teammate today.",
+  "Let's hear from every Bandit this week!"
+];
+
+function renderBoard() {
+  const highList = document.getElementById("highList");
+  const lowList = document.getElementById("lowList");
+  highList.innerHTML = ""; lowList.innerHTML = "";
+  const highs = entries.filter(e => e.type === "high");
+  const lows = entries.filter(e => e.type === "low");
+  if (!highs.length) highList.innerHTML = '<div class="empty">No highlights yet — add the first one!</div>';
+  if (!lows.length) lowList.innerHTML = '<div class="empty">No lowlights yet — it\'s ok to share struggles.</div>';
+  highs.forEach(e => highList.appendChild(entryEl(e)));
+  lows.forEach(e => lowList.appendChild(entryEl(e)));
+  const contributors = new Set(entries.map(e => (e.name||"").toLowerCase())).size;
+  document.getElementById("participation").textContent =
+    `${entries.length} entr${entries.length === 1 ? "y" : "ies"} from ${contributors} teammate${contributors === 1 ? "" : "s"} this week.`;
+  document.getElementById("encourage").textContent = encourageLines[Math.floor(Math.random()*encourageLines.length)];
+}
+
+function entryEl(e) {
+  const div = document.createElement("div");
+  div.className = "entry";
+  div.innerHTML = `<div><span class="who">${escapeHtml(e.name)}</span>${escapeHtml(e.text)}</div><span class="del">✕</span>`;
+  div.querySelector(".del").addEventListener("click", async () => {
+    try { await deleteDoc(doc(db, "rooms", ROOM, "entries", e.id)); }
+    catch (err) { console.error(err); }
+  });
+  return div;
+}
+
+async function addEntry(type) {
+  const name = document.getElementById("hlName").value.trim() || "Anonymous";
+  const text = document.getElementById("hlText").value.trim();
+  if (!text) { document.getElementById("hlText").focus(); return; }
+  document.getElementById("hlText").value = "";
+  document.getElementById("hlText").focus();
+  try {
+    await addDoc(entriesRef, { name, text, type, ts: serverTimestamp() });
+  } catch (err) {
+    setSync("offline", "Post failed — check connection");
+    console.error(err);
+  }
+}
+document.getElementById("addHigh").addEventListener("click", () => addEntry("high"));
+document.getElementById("addLow").addEventListener("click", () => addEntry("low"));
+document.getElementById("hlText").addEventListener("keydown", e => { if (e.key === "Enter") addEntry("high"); });
+document.getElementById("clearWeek").addEventListener("click", async () => {
+  if (!confirm("Clear ALL highlights and lowlights for the whole team? This can't be undone.")) return;
+  try {
+    const snap = await getDocs(entriesRef);
+    const batch = writeBatch(db);
+    snap.forEach(d => batch.delete(d.ref));
+    await batch.commit();
+  } catch (err) { console.error(err); }
+});
+
+/* realtime entries listener (ordered oldest first) */
+onSnapshot(query(entriesRef, orderBy("ts", "asc")), (snap) => {
+  entries = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  renderBoard();
+}, (err) => {
+  console.error("entries listener error", err);
+});
+
+/* ============ UTIL ============ */
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+}
+
+/* ============ INIT ============ */
+drawWheel();
+renderMembers();
+loadTrivia();
+document.getElementById("wyrNext").click();
+renderBoard();
+</script>
+</body>
+</html>
